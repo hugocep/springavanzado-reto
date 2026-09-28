@@ -1,0 +1,304 @@
+{
+  "info": {
+    "name": "Reto - API de Facturacion (JWT + Asincrono)",
+    "description": "Coleccion para evidenciar el reto: autenticacion JWT, endpoints v1 sincrono y v2 asincrono, y el endpoint publico de salud. Ejecuta las peticiones en orden: el token y el id de factura se guardan solos en variables de la coleccion.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
+    { "key": "token", "value": "", "type": "string" },
+    { "key": "idFactura", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "1. Salud del servicio (sin token)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Responde 200 sin necesidad de token', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('El estado reportado es UP', function () {",
+              "    pm.expect(pm.response.json().status).to.eql('UP');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/actuator/health", "host": ["{{baseUrl}}"], "path": ["actuator", "health"] },
+        "description": "Endpoint publico. Debe responder 200 aun sin enviar el encabezado Authorization."
+      }
+    },
+    {
+      "name": "2. Factura v1 SIN token (debe rechazar)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Sin token el API responde 401', function () {",
+              "    pm.response.to.have.status(401);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"cliente\": \"egarza\",\n  \"direccionCliente\": {\n    \"pais\": \"MX\",\n    \"estado\": \"NUEVO LEON\",\n    \"municipio\": \"MONTERREY\",\n    \"ciudad\": \"MONTERREY\",\n    \"calle\": \"Eugenio Garza Sada\",\n    \"numero\": \"2501 Sur\",\n    \"telefono\": \"81 8358 2000\",\n    \"codigoPostal\": \"64700\"\n  },\n  \"articulos\": [\n    { \"producto\": \"PANTALON\", \"cantidad\": 2, \"precioUnitario\": 4.55 },\n    { \"producto\": \"CAMISA\", \"cantidad\": 3, \"precioUnitario\": 7.88 }\n  ]\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/v1/factura", "host": ["{{baseUrl}}"], "path": ["v1", "factura"] },
+        "description": "Evidencia de que el API quedo protegida: sin token valido la peticion se rechaza con 401."
+      }
+    },
+    {
+      "name": "3. Autenticar (obtener token)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('La autenticacion responde 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var token = pm.response.text().trim();",
+              "pm.test('Se recibio un token JWT con sus tres partes', function () {",
+              "    pm.expect(token.split('.').length).to.eql(3);",
+              "});",
+              "pm.collectionVariables.set('token', token);",
+              "console.log('Token guardado en la variable {{token}}');"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json; charset=utf-8" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"usuario\": \"developer\",\n  \"contraseña\": \"12345\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/autenticar", "host": ["{{baseUrl}}"], "path": ["autenticar"] },
+        "description": "Endpoint publico que valida las credenciales developer/12345 y devuelve el token JWT en texto plano."
+      }
+    },
+    {
+      "name": "4. Factura v1 CON token (sincrono)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Responde 201 Created', function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "var factura = pm.response.json();",
+              "pm.test('El subtotal es 32.74', function () {",
+              "    pm.expect(Number(factura.subtotal)).to.eql(32.74);",
+              "});",
+              "pm.test('El IVA es 5.24', function () {",
+              "    pm.expect(Number(factura.iva)).to.eql(5.24);",
+              "});",
+              "pm.test('El total es 37.98', function () {",
+              "    pm.expect(Number(factura.total)).to.eql(37.98);",
+              "});",
+              "pm.test('La respuesta tarda mas de 4 segundos por ser sincrona', function () {",
+              "    pm.expect(pm.response.responseTime).to.be.above(4000);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"cliente\": \"egarza\",\n  \"direccionCliente\": {\n    \"pais\": \"MX\",\n    \"estado\": \"NUEVO LEON\",\n    \"municipio\": \"MONTERREY\",\n    \"ciudad\": \"MONTERREY\",\n    \"calle\": \"Eugenio Garza Sada\",\n    \"numero\": \"2501 Sur\",\n    \"telefono\": \"81 8358 2000\",\n    \"codigoPostal\": \"64700\"\n  },\n  \"articulos\": [\n    { \"producto\": \"PANTALON\", \"cantidad\": 2, \"precioUnitario\": 4.55 },\n    { \"producto\": \"CAMISA\", \"cantidad\": 3, \"precioUnitario\": 7.88 }\n  ]\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/v1/factura", "host": ["{{baseUrl}}"], "path": ["v1", "factura"] },
+        "description": "Comportamiento original intacto: la respuesta llega hasta que la factura esta calculada, por eso tarda alrededor de cinco segundos."
+      }
+    },
+    {
+      "name": "5. Factura v2 - POST (asincrono)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Responde 202 Accepted', function () {",
+              "    pm.response.to.have.status(202);",
+              "});",
+              "pm.test('Incluye el encabezado Location', function () {",
+              "    pm.expect(pm.response.headers.has('Location')).to.be.true;",
+              "});",
+              "pm.test('Incluye el encabezado Retry-After', function () {",
+              "    pm.expect(pm.response.headers.has('Retry-After')).to.be.true;",
+              "});",
+              "pm.test('La respuesta es inmediata (menos de 2 segundos)', function () {",
+              "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+              "});",
+              "var id = pm.response.text().trim();",
+              "pm.collectionVariables.set('idFactura', id);",
+              "console.log('Id de factura guardado: ' + id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"cliente\": \"egarza\",\n  \"direccionCliente\": {\n    \"pais\": \"MX\",\n    \"estado\": \"NUEVO LEON\",\n    \"municipio\": \"MONTERREY\",\n    \"ciudad\": \"MONTERREY\",\n    \"calle\": \"Eugenio Garza Sada\",\n    \"numero\": \"2501 Sur\",\n    \"telefono\": \"81 8358 2000\",\n    \"codigoPostal\": \"64700\"\n  },\n  \"articulos\": [\n    { \"producto\": \"PANTALON\", \"cantidad\": 2, \"precioUnitario\": 4.55 },\n    { \"producto\": \"CAMISA\", \"cantidad\": 3, \"precioUnitario\": 7.88 }\n  ]\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/v2/factura", "host": ["{{baseUrl}}"], "path": ["v2", "factura"] },
+        "description": "La peticion se acepta y responde de inmediato con 202. El calculo continua en un hilo del pool."
+      }
+    },
+    {
+      "name": "6. Factura v2 - GET en proceso (204)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Responde 204 porque la factura sigue generandose', function () {",
+              "    pm.response.to.have.status(204);",
+              "});",
+              "pm.test('El cuerpo viene vacio', function () {",
+              "    pm.expect(pm.response.text()).to.be.oneOf(['', undefined, null]);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/v2/factura/{{idFactura}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["v2", "factura", "{{idFactura}}"]
+        },
+        "description": "Ejecuta esta peticion dentro de los primeros cinco segundos posteriores al POST para observar el 204."
+      }
+    },
+    {
+      "name": "7. Factura v2 - GET terminada (200)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Espera seis segundos para asegurar que el calculo asincrono termino.",
+              "setTimeout(function () {}, 6000);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Responde 200 con la factura generada', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var factura = pm.response.json();",
+              "pm.test('El identificador coincide con el entregado en el POST', function () {",
+              "    pm.expect(factura.id).to.eql(pm.collectionVariables.get('idFactura'));",
+              "});",
+              "pm.test('El total es 37.98', function () {",
+              "    pm.expect(Number(factura.total)).to.eql(37.98);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/v2/factura/{{idFactura}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["v2", "factura", "{{idFactura}}"]
+        },
+        "description": "Ejecuta esta peticion despues de seis segundos del POST para recibir la factura ya calculada."
+      }
+    },
+    {
+      "name": "8. Factura v2 - GET inexistente (404)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Un identificador desconocido responde 404', function () {",
+              "    pm.response.to.have.status(404);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/v2/factura/9999999999999",
+          "host": ["{{baseUrl}}"],
+          "path": ["v2", "factura", "9999999999999"]
+        },
+        "description": "Identificador que nunca fue emitido por el servicio."
+      }
+    },
+    {
+      "name": "9. Factura v2 CON token alterado (401)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Un token invalido responde 401', function () {",
+              "    pm.response.to.have.status(401);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer token.falso.invalido" }],
+        "url": {
+          "raw": "{{baseUrl}}/v2/factura/{{idFactura}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["v2", "factura", "{{idFactura}}"]
+        },
+        "description": "Evidencia de que la firma del token se valida: un token alterado no da acceso."
+      }
+    }
+  ]
+}
